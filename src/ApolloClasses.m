@@ -3,6 +3,7 @@
 #include <stdatomic.h>
 
 Class ApolloClassASBackgroundLayoutSpec;
+Class ApolloClassASBatchContext;
 Class ApolloClassASButtonNode;
 Class ApolloClassASCellNode;
 Class ApolloClassASCenterLayoutSpec;
@@ -44,6 +45,7 @@ Class ApolloClassCommentsHeaderCellNode;
 Class ApolloClassCommentsHeaderSectionController;
 Class ApolloClassRichMediaHeaderCellNode;
 Class ApolloClassCommentsViewController;
+Class ApolloClassMoreCommentsCellNode;
 Class ApolloClassCompactPostCellNode;
 Class ApolloClassComposePostViewController;
 Class ApolloClassComposeViewController;
@@ -135,6 +137,7 @@ static void ApolloClassesImageLoaded(const struct mach_header *header) {
 __attribute__((constructor)) static void ApolloClassesResolve(void) {
     objc_addLoadImageFunc(ApolloClassesImageLoaded);
     ApolloClassASBackgroundLayoutSpec = objc_getClass("ASBackgroundLayoutSpec");
+    ApolloClassASBatchContext = objc_getClass("ASBatchContext");
     ApolloClassASButtonNode = objc_getClass("ASButtonNode");
     ApolloClassASCellNode = objc_getClass("ASCellNode");
     ApolloClassASCenterLayoutSpec = objc_getClass("ASCenterLayoutSpec");
@@ -176,6 +179,7 @@ __attribute__((constructor)) static void ApolloClassesResolve(void) {
     ApolloClassCommentsHeaderSectionController = objc_getClass("_TtC6Apollo31CommentsHeaderSectionController");
     ApolloClassRichMediaHeaderCellNode = objc_getClass("_TtC6Apollo23RichMediaHeaderCellNode");
     ApolloClassCommentsViewController = objc_getClass("_TtC6Apollo22CommentsViewController");
+    ApolloClassMoreCommentsCellNode = objc_getClass("_TtC6Apollo20MoreCommentsCellNode");
     ApolloClassCompactPostCellNode = objc_getClass("_TtC6Apollo19CompactPostCellNode");
     ApolloClassComposePostViewController = objc_getClass("_TtC6Apollo25ComposePostViewController");
     ApolloClassComposeViewController = objc_getClass("_TtC6Apollo21ComposeViewController");
