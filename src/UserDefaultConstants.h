@@ -358,6 +358,12 @@ static NSString *const UDKeyLiquidGlassEnabled = @"LiquidGlassEnabled";
 // dragging to switch tabs (an either/or; needs a relaunch to apply). Opt-in;
 // default OFF via registerDefaults. See ApolloLiquidGlass.xm.
 static NSString *const UDKeyTabBarSwipeNavigation = @"TabBarSwipeNavigation";
+// Experimental large post cards on Duo's opened landscape display:
+// 0 = Original (default), 2 = Focused feed; value 1 is retired.
+static NSString *const UDKeyDuoLandscapeFeedLayout = @"DuoLandscapeFeedLayout";
+// Open Duo subreddit panel appearance: NO = Standard
+// (default), YES = Liquid Glass. The panel keeps the same size and navigation.
+static NSString *const UDKeyDuoSubredditPanelGlassEnabled = @"DuoSubredditPanelGlassEnabled";
 // iPad only. When ON, replaces each tab's single navigation stack with a
 // multi-column UISplitViewController: sidebar (the tab's own root list) →
 // content → detail. Opt-in; default OFF via registerDefaults. Installation

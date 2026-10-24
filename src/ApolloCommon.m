@@ -8,11 +8,14 @@
 #import <mach-o/loader.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
+#import <dlfcn.h>
 #import <OSLog/OSLog.h>
 #import <os/lock.h>
 #include <stdatomic.h>
 #import <Security/Security.h>
 #import "ApolloClasses.h"
+#import "ApolloDeviceIdentity.h"
+#include <sys/sysctl.h>
 
 #pragma mark - Security dictionaries
 
@@ -621,6 +624,77 @@ static NSDictionary *(*sLiquidGlassOriginalInfoDictionary)(id, SEL);
 static id (*sLiquidGlassOriginalInfoValue)(id, SEL, NSString *);
 static NSString *const kApolloDesignCompatibilityKey = @"UIDesignRequiresCompatibility";
 
+static NSInteger ApolloLogicalDeviceDisplayCount(void) {
+    // Duo requires iOS 27.1. On iOS 26 and earlier there is no foldable
+    // display. Scene/window geometry is unavailable during +load and a closed
+    // Duo can otherwise be mistaken for a regular phone. This capability
+    // counts the built-in logical displays before UIKit creates a scene, in
+    // either pose (the Device Hub Duo simulator reports 2, phones report 1).
+    static NSInteger count;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        if (NSProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27) {
+            count = 1;
+            return;
+        }
+        void *gestalt = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_LAZY | RTLD_LOCAL);
+        CFIndex (*displayCount)(void) = gestalt ? dlsym(gestalt, "MGGetLogicalDeviceDisplayCount") : NULL;
+        CFIndex gestaltCount = displayCount ? displayCount() : 0;
+        if (gestalt) dlclose(gestalt);
+        // Real Duo hardware reports one logical display here, so also check
+        // the model. sysctl reads the raw identifier (uname is remapped by
+        // the tweak); the simulator reports the host arch instead.
+        char machine[64] = {0};
+        size_t length = sizeof(machine) - 1;
+        if (sysctlbyname("hw.machine", machine, &length, NULL, 0) != 0) machine[0] = '\0';
+        const char *model = machine;
+        if (strncmp(machine, "iPhone", 6) != 0) {
+            const char *simModel = getenv("SIMULATOR_MODEL_IDENTIFIER");
+            if (simModel) model = simModel;
+        }
+        BOOL duoModel = ApolloMachineIsIPhoneDuo(model);
+        count = duoModel ? MAX(gestaltCount, 2) : gestaltCount;
+        ApolloLog(@"[DeviceDuo] model=%s logical displays=%ld duo=%d",
+                  model, (long)gestaltCount, count > 1);
+    });
+    return count;
+}
+
+BOOL ApolloDeviceIsDuo(void) {
+    return ApolloLogicalDeviceDisplayCount() > 1;
+}
+
+static BOOL ApolloLiquidGlassDisabledForLaunch(__unused id object, __unused SEL selector) {
+    return NO;
+}
+
+static Method ApolloLiquidGlassRuntimeSelectionMethod(void) {
+    // UIKit's Solarium feature is the Liquid Glass design gate. Its cached
+    // getters call this method once at launch on iOS 26/27. Unlike changing
+    // dyld's SDK answers, overriding this gate does not change unrelated SDK
+    // compatibility decisions or Duo's executable stamp. Validate the ABI
+    // before replacing it, and never install it in a host such as LiveContainer.
+    Class features = objc_lookUpClass("_UIKitFeatures");
+    Method method = class_getClassMethod(features,
+        sel_registerName("uncachedSolariumEnabledForCurrentDeviceIdiom"));
+    if (!method || method_getNumberOfArguments(method) != 2) return NULL;
+    char resultType[8] = {0};
+    method_getReturnType(method, resultType, sizeof(resultType));
+    return strcmp(resultType, @encode(BOOL)) == 0 ? method : NULL;
+}
+
+static BOOL ApolloLiquidGlassTryDisableRuntimeDesign(Method designMethod, BOOL (*designEnabled)(void)) {
+    if (!designMethod || !designEnabled) return NO;
+    IMP original = method_setImplementation(designMethod, (IMP)ApolloLiquidGlassDisabledForLaunch);
+    // UIKit may already have cached its design before our +load. Restore the
+    // original method when verification fails so the caller can retain Glass.
+    if (designEnabled()) {
+        method_setImplementation(designMethod, original);
+        return NO;
+    }
+    return YES;
+}
+
 static NSDictionary *ApolloLiquidGlassInfoDictionary(NSBundle *bundle, SEL selector) {
     NSDictionary *original = sLiquidGlassOriginalInfoDictionary(bundle, selector);
     if (bundle != sLiquidGlassAppBundle) return original;
@@ -671,9 +745,28 @@ static void ApolloInitializeLiquidGlassMode(void) {
         Method valueMethod = class_getInstanceMethod(NSBundle.class, @selector(objectForInfoDictionaryKey:));
         const struct mach_header *nativeHeader = ApolloNativeImageHeader();
         BOOL standalone = nativeHeader && nativeHeader->filetype == MH_EXECUTE;
-        sLiquidGlassCanToggle = ApolloSDKSupportsLiquidGlassCompatibility(sdkVersion, glassRuntime) &&
+        NSInteger runtimeMajor = NSProcessInfo.processInfo.operatingSystemVersion.majorVersion;
+        NSInteger logicalDisplays = glassRuntime ? ApolloLogicalDeviceDisplayCount() : 0;
+        BOOL bundleCompatibility = ApolloSDKSupportsLiquidGlassCompatibility(sdkVersion, glassRuntime);
+        BOOL runtimeCompatibility = ApolloSDKSupportsLiquidGlassRuntimeSelection(sdkVersion,
+            glassRuntime, runtimeMajor, logicalDisplays);
+        Method designMethod = runtimeCompatibility ? ApolloLiquidGlassRuntimeSelectionMethod() : NULL;
+        BOOL (*designEnabled)(void) = runtimeCompatibility ? dlsym(RTLD_DEFAULT, "_UISolariumEnabled") : NULL;
+        sLiquidGlassCanToggle = logicalDisplays <= 1 &&
+            (bundleCompatibility || (designMethod && designEnabled)) &&
             standalone && mainBundleIsApollo && infoMethod && valueMethod;
         sLiquidGlassEnabled = !sLiquidGlassCanToggle || requestedGlass;
+
+        if (sLiquidGlassCanToggle && runtimeCompatibility && !requestedGlass) {
+            // If UIKit cached its design before our +load, restore its method
+            // and keep our own hooks in Glass mode too. Never leave mixed
+            // Standard/Glass chrome or claim an unavailable switch succeeded.
+            if (!ApolloLiquidGlassTryDisableRuntimeDesign(designMethod, designEnabled)) {
+                sLiquidGlassCanToggle = NO;
+                sLiquidGlassEnabled = YES;
+                ApolloLog(@"[LiquidGlassMode] UIKit design already cached; keeping Glass active");
+            }
+        }
 
         if (sLiquidGlassCanToggle) {
             // Cache the bundle BEFORE swizzling: asking for mainBundle inside
@@ -684,8 +777,8 @@ static void ApolloInitializeLiquidGlassMode(void) {
             method_setImplementation(infoMethod, (IMP)ApolloLiquidGlassInfoDictionary);
             method_setImplementation(valueMethod, (IMP)ApolloLiquidGlassInfoValue);
         }
-        ApolloLog(@"[LiquidGlassMode] SDK=0x%08X runtime=%d switchAvailable=%d requested=%d active=%d",
-                  sdkVersion, glassRuntime, sLiquidGlassCanToggle, requestedGlass,
+        ApolloLog(@"[LiquidGlassMode] SDK=0x%08X runtime=%d displays=%ld switchAvailable=%d requested=%d active=%d",
+                  sdkVersion, glassRuntime, (long)logicalDisplays, sLiquidGlassCanToggle, requestedGlass,
                   sLiquidGlassBuildAvailable && sLiquidGlassEnabled);
     });
 }
