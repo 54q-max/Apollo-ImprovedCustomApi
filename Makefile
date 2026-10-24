@@ -75,6 +75,7 @@ ApolloReborn_FILES = \
     $(WHATS_NEW_GEN_M) \
     $(SRC_DIR)/Tweak.xm \
     $(SRC_DIR)/ApolloCommon.m \
+    $(SRC_DIR)/ApolloLogRedaction.m \
     $(SRC_DIR)/ApolloSessionState.m \
     $(SRC_DIR)/ApolloSessionRestoration.xm \
     $(SRC_DIR)/ApolloInlineImageMetadata.m \
