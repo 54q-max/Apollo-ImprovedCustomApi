@@ -3673,7 +3673,7 @@ static void ApolloShowRedditRateLimitToast(NSTimeInterval seconds) {
                                     UDKeyEnableFlairColors: @NO,
                                     UDKeyBoldPostTitles: @NO,
                                     UDKeyFeedTextPostThumbnails: @YES,
-                                    UDKeyRestoreReadingSession: @YES,
+                                    UDKeyRestoreReadingSession: @NO,
                                     UDKeyFeedGalleryCarousel: @YES,
                                     UDKeyFeedGalleryEdgeSwipeNav: @NO,
                                     UDKeyGalleryAutoplayVideos: @YES,
