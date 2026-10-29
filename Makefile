@@ -242,6 +242,7 @@ ApolloReborn_FILES = \
     $(SRC_DIR)/ipad/ApolloPaneGeometry.m \
     $(SRC_DIR)/ipad/ApolloPaneTransitionObserver.m \
     $(SRC_DIR)/ipad/ApolloPaneChrome.m \
+    $(SRC_DIR)/ipad/ApolloPaneMessageBar.xm \
     $(SRC_DIR)/ipad/ApolloPaneSidebar.m \
     $(SRC_DIR)/ipad/ApolloPaneFocus.m \
     $(SRC_DIR)/ipad/ApolloPaneMenus.xm \
@@ -268,6 +269,7 @@ ApolloReborn_FILES = \
     $(SRC_DIR)/ApolloHiddenContentMedia.m \
     $(SRC_DIR)/ApolloHiddenContentMediaBridge.swift \
     $(SRC_DIR)/ApolloHiddenContentMenu.xm \
+    $(SRC_DIR)/ApolloProfileRowWrapper.xm \
     $(SRC_DIR)/ApolloHideLinksBatchFix.xm \
     $(SRC_DIR)/ApolloSavedItemsDeduplicator.m \
     $(SRC_DIR)/ApolloSavedCategories.xm \
