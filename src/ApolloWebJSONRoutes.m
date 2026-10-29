@@ -87,6 +87,23 @@ BOOL ApolloWebJSONRouteResponseIsBlockPage(NSHTTPURLResponse *response) {
     return [contentType containsString:@"text/html"];
 }
 
+// What the fallback to old (the table above) gets for an account Old Reddit
+// won't serve. It counts as a refusal, like the block page.
+BOOL ApolloWebJSONRouteResponseIsSignInGate(NSHTTPURLResponse *response) {
+    if (![response isKindOfClass:[NSHTTPURLResponse class]]) return NO;
+    NSString *host = response.URL.host.lowercaseString ?: @"";
+    if (![host isEqualToString:@"reddit.com"] && ![host hasSuffix:@".reddit.com"]) return NO;
+    // No read asks for /login itself, so ending up there means a redirect.
+    NSString *path = response.URL.path.lowercaseString ?: @"";
+    if (![path isEqualToString:@"/login"] && ![path hasPrefix:@"/login/"]) return NO;
+    NSString *contentType = [[response valueForHTTPHeaderField:@"Content-Type"] lowercaseString] ?: @"";
+    return [contentType containsString:@"text/html"];
+}
+
+BOOL ApolloWebJSONRouteResponseIsRefusal(NSHTTPURLResponse *response) {
+    return ApolloWebJSONRouteResponseIsBlockPage(response) || ApolloWebJSONRouteResponseIsSignInGate(response);
+}
+
 #pragma mark - Remote route table (keyless-routes.json)
 
 static NSUInteger const kApolloWebJSONRouteTableMaxBytes = 16 * 1024;
