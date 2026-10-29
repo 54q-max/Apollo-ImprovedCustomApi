@@ -14,7 +14,7 @@ Installs with API-Key-Free Mode on and **Use Route Updates** on (the default) fe
 | `api` | `api.reddit.com`, path unchanged |
 | `oauth` | `oauth.reddit.com`, path unchanged, with the cookie and no bearer |
 
-These are the only routes. The file names them; it can't give a host or URL. `api` isn't in the built-in table: as of 2026-10-24 it refused both built-in endpoints for the cookie, and it's there so the file can use it again if Reddit reopens it. For `/api/info` alone, `www.reddit.com/r/all/api/info.json` also answered the cookie then; it isn't a route, but it's the next one to add if the others close.
+These are the only routes. The file names them; it can't give a host or URL. `api` isn't in the built-in table: as of 2026-10-24 it refused both built-in endpoints for the cookie, and it's there so the file can use it again if Reddit reopens it.
 
 Search is built in as `oauth`, then `old`. www blocks post search for the cookie. `oauth.reddit.com` blocks it for tokens issued to Reddit's desktop web client (`cid` `0R-WAMhuoo-MyQ`), which includes the `token_v2` cookie, but accepts tokens minted for the mobile client. Search doesn't need either: `oauth` and `old` both served it signed in to the cookie alone on 2026-10-27 (tested on one account). Of the cookie, `reddit_session` is what matters; `token_v2` isn't needed, and a stale one doesn't break the request. The search endpoints are global (`/search`), subreddit discovery (`/subreddits/search`) and community (`/r/*/search`). The last also covers Apollo's multireddit search, which joins the subreddits with `+` (`/r/a+b+c/search`); Apollo never uses Reddit's `/user/<name>/m/<multi>/search` form.
 
@@ -49,3 +49,7 @@ Review the route as well as the JSON. Reddit is limiting `old.reddit.com` to acc
 3. To undo every override, set `"endpoints": {}` or delete the file. Installs drop their overrides on the next check.
 
 The app logs the overrides in effect, with the built-in order each replaces, under `[WebJSON] Route updates`.
+
+## r/all
+
+www.reddit.com answers every path under `/r/all` with its block page, signed in or not (as of 2026-10-28): each sort, the `r/all-<sub>` filter form and `r/all+<sub>`. r/popular, Home and the other subreddits still load there. So r/all's listings go by `api`, then `old`. api.reddit.com serves them signed in to the cookie, with the same image fields as www's feeds, and old.reddit.com does for accounts Old Reddit still serves. These routes are built in, and like any feed this file can't change them. The Routes screen lists them as `GET /r/all`.
